@@ -23,48 +23,52 @@ import matplotlib.gridspec as gridspec
 import numpy as np
 
 logger = logging.getLogger("visualize")
-
 # ── Style config ─────────────────────────────────────────────────────────────
-PALETTE = {
-    "original": "#4A90D9",   # calm blue  – original (noisy)
-    "cleaned":  "#27AE60",   # green      – cleaned output
-    "noise":    "#E74C3C",   # red        – noise estimate
-    "bg":       "#1E1E2E",   # dark background
-    "text":     "#CDD6F4",   # light text
-    "grid":     "#313244",   # subtle grid lines
+PALETTES = {
+    "dark": {
+        "original": "#89b4fa",   # blue
+        "cleaned":  "#a6e3a1",   # green
+        "noise":    "#f38ba8",   # red
+        "bg":       "#0b0b14",   # deep dark
+        "text":     "#cdd6f4",   # light text
+        "grid":     "#313244",   # subtle grid
+    },
+    "light": {
+        "original": "#1e66f5",   # deep blue
+        "cleaned":  "#40a02b",   # rich green
+        "noise":    "#d20f39",   # vivid red
+        "bg":       "#f4f5f7",   # soft gray background
+        "text":     "#4c4f69",   # dark text
+        "grid":     "#ccd0da",   # soft grid
+    }
 }
 
-
-def _apply_dark_style(fig: plt.Figure) -> None:
-    """Apply a consistent dark theme to the figure."""
-    fig.patch.set_facecolor(PALETTE["bg"])
+def _apply_theme_style(fig: plt.Figure, theme: str = "dark") -> None:
+    """Apply a consistent theme (light/dark) to the figure."""
+    palette = PALETTES.get(theme, PALETTES["dark"])
+    fig.patch.set_facecolor(palette["bg"])
     for ax in fig.get_axes():
-        ax.set_facecolor(PALETTE["bg"])
-        ax.tick_params(colors=PALETTE["text"], labelsize=8)
-        ax.xaxis.label.set_color(PALETTE["text"])
-        ax.yaxis.label.set_color(PALETTE["text"])
-        ax.title.set_color(PALETTE["text"])
+        ax.set_facecolor(palette["bg"])
+        ax.tick_params(colors=palette["text"], labelsize=8)
+        ax.xaxis.label.set_color(palette["text"])
+        ax.yaxis.label.set_color(palette["text"])
+        if hasattr(ax, "title"):
+            ax.title.set_color(palette["text"])
         for spine in ax.spines.values():
-            spine.set_color(PALETTE["grid"])
-        ax.grid(color=PALETTE["grid"], linewidth=0.5, linestyle="--", alpha=0.6)
+            spine.set_color(palette["grid"])
+        ax.grid(color=palette["grid"], linewidth=0.5, linestyle="--", alpha=0.6)
 
 
 def plot_waveform_comparison(
     original: np.ndarray,
     cleaned: np.ndarray,
     sr: int,
+    theme: str = "dark"
 ) -> plt.Figure:
     """
     Render a 2-row waveform comparison plot.
-
-    Args:
-        original : raw (noisy) audio array
-        cleaned  : denoised audio array
-        sr       : sample rate (Hz)
-
-    Returns:
-        matplotlib Figure – pass directly to st.pyplot()
     """
+    palette = PALETTES.get(theme, PALETTES["dark"])
     duration_orig = len(original) / sr
     duration_cln  = len(cleaned)  / sr
 
@@ -74,22 +78,22 @@ def plot_waveform_comparison(
     fig, axes = plt.subplots(2, 1, figsize=(10, 4), sharex=False)
 
     # ── Top: original ────────────────────────────────────────────────────────
-    axes[0].plot(t_orig, original, color=PALETTE["original"], linewidth=0.5, alpha=0.9)
+    axes[0].plot(t_orig, original, color=palette["original"], linewidth=0.5, alpha=0.9)
     axes[0].set_title("🔴  Original (Noisy)", fontsize=10, pad=6)
     axes[0].set_ylabel("Amplitude", fontsize=8)
     axes[0].set_ylim(-1.05, 1.05)
 
     # ── Bottom: cleaned ──────────────────────────────────────────────────────
-    axes[1].plot(t_cln, cleaned, color=PALETTE["cleaned"], linewidth=0.5, alpha=0.9)
+    axes[1].plot(t_cln, cleaned, color=palette["cleaned"], linewidth=0.5, alpha=0.9)
     axes[1].set_title("🟢  Cleaned (Denoised)", fontsize=10, pad=6)
     axes[1].set_ylabel("Amplitude", fontsize=8)
     axes[1].set_xlabel("Time (s)", fontsize=8)
     axes[1].set_ylim(-1.05, 1.05)
 
-    fig.suptitle("Waveform Comparison", fontsize=12, color=PALETTE["text"], y=1.01)
+    fig.suptitle("Waveform Comparison", fontsize=12, color=palette["text"], y=1.01)
     fig.tight_layout()
-    _apply_dark_style(fig)
-    logger.info("Waveform comparison plot generated.")
+    _apply_theme_style(fig, theme)
+    logger.info("Waveform comparison plot generated (%s theme).", theme)
     return fig
 
 
@@ -97,13 +101,12 @@ def plot_spectrogram_comparison(
     original: np.ndarray,
     cleaned: np.ndarray,
     sr: int,
+    theme: str = "dark"
 ) -> plt.Figure:
     """
     Mel spectrogram side-by-side comparison.
-
-    Mel spectrograms map frequency content onto a perceptual scale,
-    making it easy to see what noise bands were removed.
     """
+    palette = PALETTES.get(theme, PALETTES["dark"])
     fig, axes = plt.subplots(1, 2, figsize=(12, 4))
 
     def _draw_mel(ax, audio, title, cmap):
@@ -115,15 +118,17 @@ def plot_spectrogram_comparison(
             fmax=8000, ax=ax, cmap=cmap
         )
         ax.set_title(title, fontsize=10)
-        fig.colorbar(img, ax=ax, format="%+2.0f dB", shrink=0.8)
+        cbar = fig.colorbar(img, ax=ax, format="%+2.0f dB", shrink=0.8)
+        cbar.ax.yaxis.set_tick_params(color=palette["text"])
+        plt.setp(plt.getp(cbar.ax.axes, 'yticklabels'), color=palette["text"])
 
     _draw_mel(axes[0], original, "🔴  Original Spectrogram", "magma")
     _draw_mel(axes[1], cleaned,  "🟢  Cleaned Spectrogram",  "viridis")
 
-    fig.suptitle("Mel Spectrogram Comparison", fontsize=12, color=PALETTE["text"])
+    fig.suptitle("Mel Spectrogram Comparison", fontsize=12, color=palette["text"])
     fig.tight_layout()
-    _apply_dark_style(fig)
-    logger.info("Spectrogram comparison plot generated.")
+    _apply_theme_style(fig, theme)
+    logger.info("Spectrogram comparison plot generated (%s theme).", theme)
     return fig
 
 
@@ -131,11 +136,12 @@ def plot_noise_profile(
     original: np.ndarray,
     cleaned: np.ndarray,
     sr: int,
+    theme: str = "dark"
 ) -> plt.Figure:
     """
     Bar chart showing estimated noise reduction across frequency bands.
-    Computed as the power difference (original − cleaned) per band.
     """
+    palette = PALETTES.get(theme, PALETTES["dark"])
     n_bands   = 8
     band_size = len(original) // n_bands
 
@@ -153,17 +159,17 @@ def plot_noise_profile(
     width = 0.35
 
     fig, ax = plt.subplots(figsize=(9, 3.5))
-    ax.bar(x - width / 2, orig_rms, width, label="Original",  color=PALETTE["original"], alpha=0.85)
-    ax.bar(x + width / 2, cln_rms,  width, label="Cleaned",   color=PALETTE["cleaned"],  alpha=0.85)
+    ax.bar(x - width / 2, orig_rms, width, label="Original",  color=palette["original"], alpha=0.85)
+    ax.bar(x + width / 2, cln_rms,  width, label="Cleaned",   color=palette["cleaned"],  alpha=0.85)
 
     ax.set_xlabel("Audio Band", fontsize=8)
     ax.set_ylabel("RMS Energy", fontsize=8)
     ax.set_title("Energy Per Band — Before vs After Denoising", fontsize=10)
     ax.set_xticks(x)
     ax.set_xticklabels(band_labels, fontsize=8)
-    ax.legend(fontsize=8, facecolor=PALETTE["bg"], labelcolor=PALETTE["text"])
+    ax.legend(fontsize=8, facecolor=palette["bg"], labelcolor=palette["text"])
 
     fig.tight_layout()
-    _apply_dark_style(fig)
-    logger.info("Noise profile chart generated.")
+    _apply_theme_style(fig, theme)
+    logger.info("Noise profile chart generated (%s theme).", theme)
     return fig

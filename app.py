@@ -56,15 +56,52 @@ logging.basicConfig(
 )
 logger = logging.getLogger("app")
 
+# ── Pipeline defaults ─────────────────────────────────────────────────────────
+NR_STRENGTH_DEFAULT  = 0.75
+LOW_GAIN_DEFAULT     = 0.0
+MID_GAIN_DEFAULT     = 0.0
+HIGH_GAIN_DEFAULT    = 0.0
+COMP_RATIO_DEFAULT   = 1.0
+COMP_THRESHOLD_DEFAULT = -20
+OUTPUT_GAIN_DEFAULT  = 0.0
+
+
+# ── Theme Configuration ───────────────────────────────────────────────────────
+if "theme" not in st.session_state:
+    st.session_state.theme = "dark"
+
+PALETTES = {
+    "dark": {
+        "bg": "#0b0b14",
+        "card_bg": "rgba(23, 23, 37, 0.7)",
+        "text": "#cdd6f4",
+        "text_dim": "#a6adc8",
+        "accent": "#89b4fa",
+        "accent2": "#cba6f7",
+        "border": "rgba(255, 255, 255, 0.08)",
+        "plot_bg": "#1e1e2e"
+    },
+    "light": {
+        "bg": "#f4f5f7",
+        "card_bg": "rgba(255, 255, 255, 0.85)",
+        "text": "#4c4f69",
+        "text_dim": "#5c5f77",
+        "accent": "#1e66f5",
+        "accent2": "#8839ef",
+        "border": "rgba(0, 0, 0, 0.08)",
+        "plot_bg": "#ffffff"
+    }
+}
+cp = PALETTES[st.session_state.theme]
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Page config (must be the very first Streamlit call)
 # ─────────────────────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="AI Audio Noise Reducer",
+    page_title="AI Audio Studio Cleaner",
     page_icon="🎙️",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
 
@@ -72,53 +109,160 @@ st.set_page_config(
 # Custom CSS — minimal dark-style overrides
 # ─────────────────────────────────────────────────────────────────────────────
 st.markdown(
-    """
+    f"""
     <style>
-    /* Main background */
-    .stApp { background-color: #1E1E2E; color: #CDD6F4; }
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Inter:wght@400;600&display=swap');
 
-    /* Metric cards */
-    [data-testid="stMetricValue"] { font-size: 1.4rem !important; color: #89B4FA; }
-    [data-testid="stMetricLabel"] { color: #A6ADC8 !important; }
+    :root {{
+        --bg-color: {cp['bg']};
+        --card-bg: {cp['card_bg']};
+        --accent-color: {cp['accent']};
+        --accent-color2: {cp['accent2']};
+        --text-main: {cp['text']};
+        --text-dim: {cp['text_dim']};
+        --border-color: {cp['border']};
+    }}
 
-    /* Buttons */
-    .stButton > button {
-        background: linear-gradient(135deg, #89B4FA 0%, #74C7EC 100%);
-        color: #1E1E2E;
-        border: none;
-        border-radius: 8px;
-        font-weight: 700;
-        padding: 0.55rem 2rem;
-        font-size: 1rem;
-        transition: opacity 0.2s;
-    }
-    .stButton > button:hover { opacity: 0.85; }
+    .stApp {{
+        background-color: var(--bg-color);
+        font-family: 'Outfit', sans-serif;
+    }}
 
-    /* Section headers */
-    h2, h3 { color: #CBA6F7 !important; }
+    /* Ensure all text respects theme */
+    .stApp p, .stApp h1, .stApp h2, .stApp h3, .stApp span, .stApp label, .stApp div {{
+        color: var(--text-main);
+    }}
 
-    /* Info boxes */
-    .st-alert { border-radius: 10px; }
+    /* Glassmorphism Card */
+    .glass-card {{
+        background: var(--card-bg);
+        backdrop-filter: blur(16px) saturate(180%);
+        -webkit-backdrop-filter: blur(16px) saturate(180%);
+        border: 1px solid var(--border-color);
+        border-radius: 24px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+    }}
 
-    /* Sidebar */
-    section[data-testid="stSidebar"] {
-        background-color: #181825;
-    }
+    /* Animated Gradient Title */
+    .title-gradient {{
+        background: linear-gradient(to right, var(--accent-color2), var(--accent-color), #94e2d5, var(--accent-color), var(--accent-color2));
+        background-size: 200% auto;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: shine 5s linear infinite;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        margin: 0;
+    }}
 
-    /* Upload area */
-    [data-testid="stFileUploader"] { background-color: #24243E; border-radius: 10px; padding: 1rem; }
+    @keyframes shine {{
+        to {{ background-position: 200% center; }}
+    }}
 
-    /* Divider */
-    hr { border-color: #313244; }
+    /* Premium Buttons */
+    .stButton > button {{
+        background: linear-gradient(135deg, var(--accent-color) 0%, var(--accent-color2) 100%) !important;
+        color: {(cp['bg'] if st.session_state.theme == 'dark' else '#ffffff')} !important;
+        border: none !important;
+        border-radius: 16px !important;
+        font-weight: 700 !important;
+        padding: 0.8rem 2.5rem !important;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1) !important;
+        width: 100%;
+    }}
 
-    /* Report card */
-    .report-card {
-        background: #24243E;
+    .stButton > button:hover {{
+        transform: translateY(-4px) scale(1.02) !important;
+        box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2) !important;
+    }}
+
+    /* Sliders & Toggles */
+    .stSlider [data-baseweb="slider"] {{
+        margin-bottom: 10px;
+    }}
+
+    /* Metrics */
+    [data-testid="stMetric"] {{
+        background: rgba(128, 128, 128, 0.05);
+        border: 1px solid var(--border-color);
+        border-radius: 20px;
+        padding: 1rem !important;
+    }}
+
+    [data-testid="stMetricValue"] {{
+        color: var(--accent-color) !important;
+        font-family: 'Outfit', sans-serif !important;
+        font-weight: 700 !important;
+        font-size: 1.8rem !important;
+    }}
+
+    /* Tabs */
+    .stTabs [data-baseweb="tab-list"] {{
+        background: rgba(128, 128, 128, 0.05);
+        border-radius: 16px;
+        padding: 6px;
+        gap: 8px;
+    }}
+
+    .stTabs [data-baseweb="tab"] {{
+        background: transparent;
         border-radius: 12px;
-        padding: 1.5rem;
-        margin-top: 1rem;
-        border: 1px solid #45475A;
-    }
+        color: var(--text-dim);
+        transition: all 0.3s ease;
+        padding: 10px 20px;
+    }}
+
+    .stTabs [aria-selected="true"] {{
+        background: var(--accent-color) !important;
+        color: {(cp['bg'] if st.session_state.theme == 'dark' else '#ffffff')} !important;
+        font-weight: 600;
+    }}
+
+    /* Expander */
+    .stExpander {{
+        background: rgba(128, 128, 128, 0.03) !important;
+        border: 1px solid var(--border-color) !important;
+        border-radius: 16px !important;
+    }}
+
+    /* Progress Bar */
+    .stProgress > div > div > div > div {{
+        background-image: linear-gradient(to right, var(--accent-color), var(--accent-color2)) !important;
+    }}
+
+    /* File Uploader */
+    [data-testid="stFileUploader"] {{
+        background-color: rgba(128, 128, 128, 0.05);
+        border: 2px dashed var(--border-color);
+        border-radius: 16px;
+        padding: 1rem;
+    }}
+
+    /* Hide default sidebar handle */
+    [data-testid="collapsedControl"] {{
+        display: none;
+    }}
+
+    /* Footer */
+    .footer {{
+        text-align: center;
+        padding: 3rem 0;
+        color: var(--text-dim);
+        font-size: 0.9rem;
+        border-top: 1px solid var(--border-color);
+        margin-top: 4rem;
+    }}
+
+    .suggestion-card {{
+        background: rgba(128, 128, 128, 0.05);
+        border-left: 4px solid var(--accent-color);
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 0.5rem;
+    }}
     </style>
     """,
     unsafe_allow_html=True,
@@ -128,66 +272,39 @@ st.markdown(
 # ─────────────────────────────────────────────────────────────────────────────
 # Header
 # ─────────────────────────────────────────────────────────────────────────────
-st.markdown(
-    """
-    <div style='text-align:center; padding: 1.5rem 0 0.5rem'>
-        <h1 style='color:#CBA6F7; font-size:2.5rem; margin-bottom:0'>
-            🎙️ Audio Studio Cleaner
-        </h1>
-        <p style='color:#A6ADC8; font-size:1.05rem; margin-top:0.4rem'>
-            Professional Grade Noise Reduction & Audio Enhancement &nbsp;|&nbsp;
-            Runs 100% locally
-        </p>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+h_col1, h_col2 = st.columns([8, 2])
+with h_col1:
+    st.markdown(
+        """
+        <div style='text-align:left; padding: 1rem 0'>
+            <h1 class='title-gradient'>🎙️ Audio Studio Cleaner</h1>
+            <p style='color:var(--text-dim); font-size:1.1rem; margin-top:0.3rem; font-weight:300'>
+                Professional Grade Noise Reduction &nbsp;|&nbsp; 
+                <span style='color:var(--accent-color)'>100% Local AI</span>
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+with h_col2:
+    st.markdown("<div style='padding-top: 2rem'></div>", unsafe_allow_html=True)
+    theme_toggle = st.toggle(
+        "🌞 Light Mode" if st.session_state.theme == "dark" else "🌙 Dark Mode",
+        value=st.session_state.theme == "light",
+        key="theme_switcher"
+    )
+    if theme_toggle != (st.session_state.theme == "light"):
+        st.session_state.theme = "light" if theme_toggle else "dark"
+        st.rerun()
+
 st.divider()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Sidebar — pipeline settings
 # ─────────────────────────────────────────────────────────────────────────────
-with st.sidebar:
-    st.markdown("## ⚙️ Studio Settings")
-    st.markdown("---")
-
-    st.markdown("### 🧹 Noise Reduction")
-    use_noisereduce = st.toggle("Enable Noise Reduction", value=True,
-                                help="Spectral-gating to remove background hiss/hum.")
-    nr_strength = st.slider(
-        "Reduction Strength",
-        min_value=0.1, max_value=1.0, value=0.75, step=0.05,
-        help="Higher = stronger (risk of warbling artefacts)."
-    )
-
-    st.markdown("### 🎚️ Equalizer (EQ)")
-    low_gain = st.slider("Bass (Low)", -12.0, 12.0, 0.0, 0.5, help="Low frequency shelf (250Hz)")
-    mid_gain = st.slider("Mids", -12.0, 12.0, 0.0, 0.5, help="Mid frequency peak (1000Hz)")
-    high_gain = st.slider("Treble (High)", -12.0, 12.0, 0.0, 0.5, help="High frequency shelf (4000Hz)")
-
-    st.markdown("### 📉 Compressor")
-    comp_ratio = st.select_slider(
-        "Ratio",
-        options=[1.0, 2.0, 4.0, 8.0, 20.0],
-        value=1.0,
-        help="Compression strength. 1.0 = Off. 4.0 = Standard. 20.0 = Limiter."
-    )
-    comp_threshold = st.slider("Threshold (dB)", -60, 0, -20, 1, help="Level where compression starts.")
-
-    st.markdown("### 🔊 Output")
-    output_gain = st.slider("Output Gain (dB)", -20.0, 20.0, 0.0, 0.5)
-
-    st.markdown("---")
-    show_spectrogram = st.toggle("Show Spectrogram", value=True)
-    show_noise_profile = st.toggle("Show Noise Profile", value=True)
-
-    st.markdown("---")
-    st.markdown(
-        "<small style='color:#585B70'>All processing happens locally.<br>"
-        "No audio is sent to any server.</small>",
-        unsafe_allow_html=True,
-    )
+# Sidebar removed - settings moved inline below
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -209,27 +326,31 @@ def _render_report(report: AudioReport) -> None:
 
     # Top-level metrics row
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("⏱ Duration",        f"{report.duration_s:.1f} s")
-    col2.metric("📉 Noise Level",     report.noise_level_label)
-    col3.metric("🔊 Noise Type",      report.noise_type_label.split("(")[0].strip())
-    col4.metric("✂️ Noise Reduction", f"{report.noise_reduction_db:.1f} dB")
+    with col1:
+        st.metric("⏱ Duration", f"{report.duration_s:.1f} s")
+    with col2:
+        st.metric("📉 Noise Level", report.noise_level_label)
+    with col3:
+        st.metric("🔊 Noise Type", report.noise_type_label.split("(")[0].strip())
+    with col4:
+        st.metric("✂️ Reduction", f"{report.noise_reduction_db:.1f} dB")
 
-    st.markdown("---")
+    st.markdown("<br>", unsafe_allow_html=True)
 
     # Detailed metrics expander
     with st.expander("📐 Detailed Signal Metrics", expanded=False):
         c1, c2, c3 = st.columns(3)
-        c1.metric("Original RMS",   f"{report.original_rms_db:.1f} dB")
-        c1.metric("Cleaned RMS",    f"{report.cleaned_rms_db:.1f} dB")
-        c2.metric("Estimated SNR",  f"{report.original_snr_db:.1f} dB")
-        c2.metric("Crest Factor",   f"{report.original_crest_factor_db:.1f} dB")
+        c1.metric("Original RMS", f"{report.original_rms_db:.1f} dB")
+        c1.metric("Cleaned RMS", f"{report.cleaned_rms_db:.1f} dB")
+        c2.metric("Estimated SNR", f"{report.original_snr_db:.1f} dB")
+        c2.metric("Crest Factor", f"{report.original_crest_factor_db:.1f} dB")
         c3.metric("Spectral Flatness", f"{report.original_spectral_flatness:.4f}")
-        c3.metric("Processing Time",   f"{report.processing_time_s:.2f} s")
+        c3.metric("Processing Time", f"{report.processing_time_s:.2f} s")
 
     # Suggestions
     st.markdown("### 💡 AI Suggestions")
     for suggestion in report.suggestions:
-        st.info(suggestion)
+        st.markdown(f"<div class='suggestion-card'>{suggestion}</div>", unsafe_allow_html=True)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -248,9 +369,9 @@ if uploaded_file is None:
     st.markdown(
         """
         <div style='text-align:center; padding:2.5rem; color:#585B70;'>
-            <p style='font-size:3rem'>🎬</p>
-            <p>Upload an audio or video file to get started.<br>
-            Supported: WAV · MP3 · MPEG · MP4 · MKV · MOV · AVI · FLAC</p>
+            <p style='font-size:3.5rem; margin-bottom: 1rem'>🎬</p>
+            <p style='font-size:1.1rem; color: #a6adc8'>Upload an audio or video file to begin processing.<br>
+            <span style='font-size:0.9rem; color: #6c7086'>Supported: WAV · MP3 · MPEG · MP4 · MKV · MOV · AVI · FLAC</span></p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -282,38 +403,79 @@ with st.spinner("Loading waveform preview …"):
 
         fig_orig, ax = plt.subplots(figsize=(10, 2))
         t = np.linspace(0, duration_orig, len(orig_audio))
-        ax.plot(t, orig_audio, color="#4A90D9", linewidth=0.5, alpha=0.85)
-        ax.set_facecolor("#1E1E2E")
-        ax.tick_params(colors="#CDD6F4", labelsize=7)
-        ax.set_xlabel("Time (s)", color="#A6ADC8", fontsize=8)
-        ax.set_ylabel("Amplitude", color="#A6ADC8", fontsize=8)
+        ax.plot(t, orig_audio, color=cp["accent"], linewidth=0.5, alpha=0.85)
+        ax.set_facecolor(cp["bg"])
+        ax.tick_params(colors=cp["text"], labelsize=7)
+        ax.set_xlabel("Time (s)", color=cp["text_dim"], fontsize=8)
+        ax.set_ylabel("Amplitude", color=cp["text_dim"], fontsize=8)
         ax.set_title(
             f"Original Waveform — {duration_orig:.1f} s | {orig_sr} Hz",
-            color="#CDD6F4", fontsize=9,
+            color=cp["text"], fontsize=9,
         )
-        fig_orig.patch.set_facecolor("#1E1E2E")
+        fig_orig.patch.set_facecolor(cp["bg"])
         fig_orig.tight_layout()
         st.pyplot(fig_orig)
         plt.close(fig_orig)
     except Exception as e:
         st.warning(f"Could not render waveform preview: {e}")
 
-st.divider()
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Clean Audio button
 # ─────────────────────────────────────────────────────────────────────────────
-st.markdown("## 🧹 Noise Reduction")
+st.markdown("## 🚀 Enhance Audio")
 
+# Primary Action Button
 clean_btn = st.button(
     "🚀  Clean Audio",
     use_container_width=True,
     type="primary",
 )
 
+st.markdown(
+    "<p style='text-align:center; color:#a6adc8; font-size:0.9rem; margin-top:-1rem; margin-bottom:1.5rem'>"
+    "✨ Smart defaults active &nbsp;•&nbsp; One-click professional results</p>", 
+    unsafe_allow_html=True
+)
+
+# Advanced Settings - Collapsed by default
+with st.expander("⚙️ Advanced Studio Settings (Optional)", expanded=False):
+    st.markdown("<p style='color:#585B70; font-size:0.85rem; margin-bottom:1rem'>Tweak these settings only if you need custom audio characteristics.</p>", unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown("### 🧹 Noise Reduction")
+        use_noisereduce = st.toggle("Enable Denoising", value=True, help="Remove background hiss/hum.")
+        nr_strength = st.slider("Reduction Strength", 0.1, 1.0, NR_STRENGTH_DEFAULT, 0.05, help="Higher = stronger removal.")
+        
+    with col2:
+        st.markdown("### 🎚️ EQ & Compressor")
+        low_gain = st.slider("Bass", -12.0, 12.0, LOW_GAIN_DEFAULT, 0.5)
+        mid_gain = st.slider("Mids", -12.0, 12.0, MID_GAIN_DEFAULT, 0.5)
+        high_gain = st.slider("Treble", -12.0, 12.0, HIGH_GAIN_DEFAULT, 0.5)
+        comp_ratio = st.select_slider("Comp Ratio", options=[1.0, 2.0, 4.0, 8.0, 20.0], value=COMP_RATIO_DEFAULT)
+        
+    with col3:
+        st.markdown("### 🔊 Output & Display")
+        comp_threshold = st.slider("Threshold (dB)", -60, 0, COMP_THRESHOLD_DEFAULT, 1)
+        output_gain = st.slider("Output Gain (dB)", -20.0, 20.0, OUTPUT_GAIN_DEFAULT, 0.5)
+        show_spectrogram = st.toggle("Show Spectrogram", value=True)
+        show_noise_profile = st.toggle("Show Noise Profile", value=True)
+
+    # Simple logic to show if settings are customized
+    custom_count = 0
+    if nr_strength != NR_STRENGTH_DEFAULT: custom_count += 1
+    if low_gain != LOW_GAIN_DEFAULT: custom_count += 1
+    if mid_gain != MID_GAIN_DEFAULT: custom_count += 1
+    if high_gain != HIGH_GAIN_DEFAULT: custom_count += 1
+    if comp_ratio != COMP_RATIO_DEFAULT: custom_count += 1
+    if comp_threshold != COMP_THRESHOLD_DEFAULT: custom_count += 1
+    if output_gain != OUTPUT_GAIN_DEFAULT: custom_count += 1
+    
+    if custom_count > 0:
+        st.markdown(f"<div style='text-align:right; color:#fab387; font-size:0.8rem; font-weight:600'>⚡ {custom_count} custom settings active</div>", unsafe_allow_html=True)
+
 if not clean_btn:
-    st.caption("👆  Click the button above to start the AI denoising pipeline.")
     st.stop()
 
 
@@ -326,7 +488,7 @@ status_text   = st.empty()
 def _update_progress(fraction: float, message: str) -> None:
     progress_bar.progress(min(int(fraction * 100), 100))
     status_text.markdown(
-        f"<small style='color:#A6ADC8'>{message}</small>",
+        f"<small style='color:var(--text-dim)'>{message}</small>",
         unsafe_allow_html=True,
     )
 
@@ -397,7 +559,7 @@ with col_cln:
     st.audio(str(output_path), format="audio/wav")
 
 # ── Download button ───────────────────────────────────────────────────────────
-st.markdown("### 💾 Download Cleaned Audio")
+st.markdown("<br>", unsafe_allow_html=True)
 with open(output_path, "rb") as f:
     audio_bytes = f.read()
 st.download_button(
@@ -416,34 +578,40 @@ st.divider()
 # ─────────────────────────────────────────────────────────────────────────────
 st.markdown("## 📊 Audio Visualisations")
 
-# Waveform comparison
-with st.spinner("Rendering waveform comparison …"):
-    try:
-        fig_wave = plot_waveform_comparison(orig_audio, cleaned_audio, cleaned_sr)
-        st.pyplot(fig_wave)
-        plt.close(fig_wave)
-    except Exception as e:
-        st.warning(f"Waveform plot failed: {e}")
+tab_wave, tab_spec, tab_noise = st.tabs(["📈 Waveform", "🌈 Spectrogram", "📉 Noise Profile"])
 
-# Spectrogram comparison
-if show_spectrogram:
-    with st.spinner("Rendering spectrogram comparison …"):
+with tab_wave:
+    with st.spinner("Rendering waveform comparison …"):
         try:
-            fig_spec = plot_spectrogram_comparison(orig_audio, cleaned_audio, cleaned_sr)
-            st.pyplot(fig_spec)
-            plt.close(fig_spec)
+            fig_wave = plot_waveform_comparison(orig_audio, cleaned_audio, cleaned_sr, theme=st.session_state.theme)
+            st.pyplot(fig_wave)
+            plt.close(fig_wave)
         except Exception as e:
-            st.warning(f"Spectrogram plot failed: {e}")
+            st.warning(f"Waveform plot failed: {e}")
 
-# Noise profile (band energy chart)
-if show_noise_profile:
-    with st.spinner("Rendering noise profile chart …"):
-        try:
-            fig_noise = plot_noise_profile(orig_audio, cleaned_audio, cleaned_sr)
-            st.pyplot(fig_noise)
-            plt.close(fig_noise)
-        except Exception as e:
-            st.warning(f"Noise profile chart failed: {e}")
+with tab_spec:
+    if show_spectrogram:
+        with st.spinner("Rendering spectrogram comparison …"):
+            try:
+                fig_spec = plot_spectrogram_comparison(orig_audio, cleaned_audio, cleaned_sr, theme=st.session_state.theme)
+                st.pyplot(fig_spec)
+                plt.close(fig_spec)
+            except Exception as e:
+                st.warning(f"Spectrogram plot failed: {e}")
+    else:
+        st.info("Spectrogram display is disabled in settings.")
+
+with tab_noise:
+    if show_noise_profile:
+        with st.spinner("Rendering noise profile chart …"):
+            try:
+                fig_noise = plot_noise_profile(orig_audio, cleaned_audio, cleaned_sr, theme=st.session_state.theme)
+                st.pyplot(fig_noise)
+                plt.close(fig_noise)
+            except Exception as e:
+                st.warning(f"Noise profile chart failed: {e}")
+    else:
+        st.info("Noise profile display is disabled in settings.")
 
 st.divider()
 
@@ -454,10 +622,14 @@ st.divider()
 if report is not None:
     _render_report(report)
 
-st.divider()
 st.markdown(
-    "<small style='color:#585B70; display:block; text-align:center'>"
-    "Audio Studio Cleaner · Built with Noisereduce + Streamlit · "
-    "Runs 100% locally</small>",
+    """
+    <div class='footer'>
+        <p>🎙️ Audio Studio Cleaner &nbsp;|&nbsp; Built with AI + Noisereduce + Streamlit</p>
+        <p style='font-size:0.8rem; margin-top:0.5rem; opacity:0.6'>
+            Developed for Final Year Project &nbsp;•&nbsp; 2026 &nbsp;•&nbsp; 100% Private & Secure
+        </p>
+    </div>
+    """,
     unsafe_allow_html=True,
 )
